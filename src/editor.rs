@@ -55,7 +55,7 @@ impl Editor {
     }
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
+        let mut initial_status = String::from("HELP: Ctrl-S = save | Ctrl-Q = quit");
         let document = if args.len() > 1 {
             let file_name = &args[1];
             let doc = Document::open(&file_name);
@@ -99,7 +99,29 @@ impl Editor {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Ctrl('q') => self.should_quit = true,
-            Key::Char(c) => self.document.insert(&self.cursor_position, c),
+            Key::Ctrl('s') => {
+                if self.document.file_name.is_none() {
+                    self.document.file_name = Some(self.prompt("Save as: ")?);
+                }
+                if self.document.save().is_ok() {
+                    self.status_message = 
+                        StatusMessage::from("File saved successfully.".to_string());
+                } else {
+                    self.status_message = 
+                        StatusMessage::from("Error writing file!".to_string());
+                }
+            },
+            Key::Char(c) => {
+                self.document.insert(&self.cursor_position, c);
+                self.move_cursor(Key::Right);
+            } 
+            Key::Delete => self.document.delete(&self.cursor_position),
+            Key::Backspace => {
+                if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
+                    self.move_cursor(Key::Left);
+                    self.document.delete(&self.cursor_position);
+                }
+            }
             Key::Up            
             | Key::Down            
             | Key::Left            
@@ -258,6 +280,23 @@ impl Editor {
             print!("{}", text);            
         }
     }
+    fn prompt(&mut self, prompt: &str) -> Result<String, std::io::Error> {
+        let mut result = String::new();
+        loop {
+            self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
+            self.refresh_screen()?;
+            if let Key::Char(c) = Terminal::read_key()? {
+                if c == '\n' {
+                    self.status_message = StatusMessage::from(String::new());
+                    break;
+                }
+                if !c.is_control() {
+                    result.push(c);
+                }
+            }
+        }
+        Ok(result)
+    } 
 }        
 
 fn die(e: std::io::Error) {     
