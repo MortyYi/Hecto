@@ -1,5 +1,4 @@
 # Hecto
 A text editor implemented in Rust.
 
-cargo run 
-then it works.
+cargo run, then it works.
